@@ -16,13 +16,14 @@
 # Imports
 # -----------------------------------------------------------------------------
 import asyncio
+import importlib
 import logging
+import sys
 import threading
 import collections
 import ctypes
 import platform
 
-import libusb_package
 import usb1
 from colors import color
 
@@ -45,11 +46,18 @@ def load_libusb():
     If the library does not exists, do nothing and usb1 will search default system paths
     when usb1.USBContext is created.
     '''
-    if libusb_path := libusb_package.get_library_path():
-        logger.debug(f'loading libusb library at {libusb_path}')
-        dll_loader = ctypes.WinDLL if platform.system() == 'Windows' else ctypes.CDLL
-        libusb_dll = dll_loader(str(libusb_path), use_errno=True, use_last_error=True)
-        usb1.loadLibrary(libusb_dll)
+    if (spec := importlib.util.find_spec('libusb_package')) is not None:
+        libusb_package = importlib.util.module_from_spec(spec)
+        sys.modules['libusb_package'] = libusb_package
+        spec.loader.exec_module(libusb_package)
+
+        if libusb_path := libusb_package.get_library_path():
+                logger.debug(f'loading libusb library at {libusb_path}')
+                dll_loader = ctypes.WinDLL if platform.system() == 'Windows' else ctypes.CDLL
+                libusb_dll = dll_loader(str(libusb_path), use_errno=True, use_last_error=True)
+                usb1.loadLibrary(libusb_dll)
+        else:
+            print ("NO LIBUSB PACKAGE MODULE!!!!!!!!!!!!")
 
 
 async def open_usb_transport(spec):
